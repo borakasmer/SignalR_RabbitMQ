@@ -1,0 +1,105 @@
+﻿
+@{
+    Layout = null;
+}
+
+<!DOCTYPE html>
+
+<html ng-app="app">
+<head>
+    <meta name="viewport" content="width=device-width" />
+    <title>Index</title>
+    <script src="~/scripts/angular.min.js"></script>
+    <script src="~/Scripts/angular-sanitize.min.js"></script>
+    <script src="~/scripts/jquery-3.1.1.min.js"></script>
+    <script src="~/scripts/bootstrap.min.js"></script>
+    <link href="~/Content/bootstrap.min.css" rel="stylesheet" />
+    <script src="~/Scripts/crpt.js"></script>
+    <script src="~/scripts/jquery.signalR-2.2.2.min.js"></script>
+    <script src="~/signalr/hubs"></script>
+    <script>
+        var hubProxy;
+        var app = angular.module("app", ['ngSanitize']);
+        app.controller('Controller', ['$scope', '$sce', '$timeout', function ($scope, $sce, $timeout) {
+             hubProxy = $.connection.chat;
+            $.connection.hub.logging = true;
+             $("#hdnUserName").val(ConvertTurkish('@Session["UserName"]'));
+            $scope.UserName = $("#hdnUserName").val();
+
+            $.connection.hub.start().done(function () {
+                console.log("hub.start.done");
+            }).fail(function (error) {
+                console.log(error);
+                });
+
+            hubProxy.client.connected = function (_connectionID) {
+                $scope.ConnectionID = _connectionID;
+                $("#hdnConnectionID").val(_connectionID);
+                console.log(_connectionID);
+            }
+
+            $.connection.hub.disconnected(function () {
+                setTimeout(function () {
+                    $.connection.hub.start();
+                }, 2000); // 2sn sonra tekrar connection kurulur.
+            });
+
+            hubProxy.client.SendMessageAll = function (Message, UserName) {
+                if ($scope.MessageHistory == null || $scope.MessageHistory == undefined || $scope.MessageHistory == "") { $scope.MessageHistory = " "; }
+                $scope.MessageHistory = $sce.trustAsHtml("<font color='red'><b>" + UserName + ":</b></font>") + Crypto.decode(Message) + "<br>" + $scope.MessageHistory;
+                $scope.$apply();
+            }
+
+            $scope.SendMessage = function () { var message = Crypto.encode($scope.Message); $scope.Message = ""; hubProxy.server.sendMessageToAll(message, $scope.UserName) };
+
+            $scope.pushEnter = function (event) {
+
+                if (event.which == 13) {
+                    $scope.SendMessage();
+                }
+            }
+
+        }]);
+
+        function ConvertTurkish(input) {
+            input = input
+                .replace(/&Uuml;/g, "Ü").replace(/&uuml;/g, "ü")
+                .replace(/&Ouml;/g, "Ö").replace(/&ouml;/g, "ö")
+                .replace(/&Ccedil;/g, "Ç").replace(/&ccedil;/g, "ç");
+            input = input
+                .replace(/&#305;/g, "ı").replace(/&#304;/g, "İ")
+                .replace(/&#220;/g, "Ü").replace(/&#252;/g, "ü")
+                .replace(/&#214;/g, "Ö").replace(/&#246;/g, "ö")
+                .replace(/&#286;/g, "Ğ").replace(/&#287;/g, "ğ")
+                .replace(/&#350;/g, "Ş").replace(/&#351;/g, "ş")
+                .replace(/&#199;/g, "Ç").replace(/&#231;/g, "ç");
+
+            input = input
+                .replace(/\u0131/g, "ı").replace(/\u0130/g, "İ")
+                .replace(/\u00FC/g, "ü").replace(/\u00DC/g, "Ü")
+                .replace(/\u00F6/g, "ö").replace(/\u00D6/g, "Ö")
+                .replace(/\u011F/g, "ğ").replace(/\u011E/g, "Ğ")
+                .replace(/\u015F/g, "ş").replace(/\u015E/g, "Ş")
+                .replace(/\u00E7/g, "ç").replace(/\u00C7/g, "Ç");
+            return input;
+        }
+    </script>
+</head>
+<body>
+    <div class="container" ng-controller="Controller" id="container">
+        <div style="background-color:lightblue !important" class="jumbotron">
+            <h1>RabbitMq İle Chat<br />@String.Format("".PadRight(8, '_')) Wellcome <font color="red" face="Comic sans MS"> @Session["UserName"]</font></h1>
+        </div>
+
+        <textarea class="form-control" cols="40" rows="2" id="comment" ng-model="Message" ng-keydown="pushEnter($event)"></textarea>
+        <input type="button" value="Gönder" class="btn-warning" ng-click="SendMessage()" id="btnGeneral" />
+        <br /><br />
+        <b>Konuşma Geçmişi:</b>
+        <div class="editable2">
+            <div class="editable" contenteditable="true" ng-bind-html="MessageHistory"></div>
+        </div>
+    </div>
+    <input type="hidden" id="hdnUserName" />
+    <input type="hidden" id="hdnConnectionID" />
+</body>
+</html>
